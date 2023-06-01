@@ -1,0 +1,23 @@
+[{
+        "title" : "@@datalist.DocumentGenerationDatalistAction.config@@",
+        "properties" : [{
+                "name":"templateFile",
+                "label":"@@datalist.DocumentGenerationDatalistAction.templateFile@@",
+                "type":"file",
+                "appPath":"[APP_PATH]",
+                "allowType":".docx,.doc"       
+        },
+        {
+                "name":"fileName",
+                "label":"@@datalist.DocumentGenerationDatalistAction.fileName@@",
+                "type":"textfield"
+        },
+        {
+                "name" : "formDefId",
+                "label" : "@@datalist.DocumentGenerationDatalistAction.form@@",
+                "type" : "selectbox",
+                "options_ajax" : "[CONTEXT_PATH]/web/json/console/app[APP_PATH]/forms/options",
+                "required" : "True"
+        }]
+    
+}]
