@@ -8,16 +8,30 @@
                 "allowType":".docx,.doc"       
         },
         {
-                "name":"fileName",
-                "label":"@@datalist.DocumentGenerationDatalistAction.fileName@@",
-                "type":"textfield"
-        },
-        {
                 "name" : "formDefId",
                 "label" : "@@datalist.DocumentGenerationDatalistAction.form@@",
                 "type" : "selectbox",
                 "options_ajax" : "[CONTEXT_PATH]/web/json/console/app[APP_PATH]/forms/options",
                 "required" : "True"
+        }]    
+},
+{
+        "title" : "@@datalist.DocumentGenerationDatalistAction.imageDimension@@",
+        "properties" : [
+        {
+                "name" : "imageWidth",
+                "label" : "@@datalist.DocumentGenerationDatalistAction.imageWidth@@",
+                "type" : "textfield",
+                "description" : "@@datalist.DocumentGenerationDatalistAction.imageWidth.desc@@",
+                "required" : "True"
+        },            
+        {
+                "name" : "imageHeight",
+                "label" : "@@datalist.DocumentGenerationDatalistAction.imageHeight@@",
+                "type" : "textfield",
+                "description" : "@@datalist.DocumentGenerationDatalistAction.imageHeight.desc@@",
+                "required" : "True"
         }]
-    
+        
 }]
+
