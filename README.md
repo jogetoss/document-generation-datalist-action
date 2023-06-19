@@ -1,6 +1,6 @@
 # Description
 
-This repository is meant to serve as a general template for how to set up new repositories in the JogetOSS organization. 
+This plugin is still at the inception stage. The aim of this plugin is to be able to generate a .docx file against an existing form record in a Joget app list based on a .docx template.
 
 # Getting Help
 
