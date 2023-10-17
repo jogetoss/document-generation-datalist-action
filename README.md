@@ -1,6 +1,8 @@
 # Description
 
-This plugin is still at the inception stage. The aim of this plugin is to be able to generate a .docx file against an existing form record in a Joget app list based on a .docx template.
+**Document Generation Datalist Action** is a plugin that exports form data to a Word Document based on a specific template.
+
+To setup and configure this plugin, please see the documentation at https://dev.joget.org/community/display/marketplace/Document+Generation+Datalist+Action
 
 # Getting Help
 
