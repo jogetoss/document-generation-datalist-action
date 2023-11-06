@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.servlet.ServletException;
@@ -40,6 +42,8 @@ import org.joget.apps.form.model.FormRowSet;
 import org.joget.apps.form.service.FileUtil;
 import org.joget.commons.util.LogUtil;
 import org.joget.workflow.util.WorkflowUtil;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  *
@@ -56,7 +60,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
     @Override
     public String getVersion() {
-        return "8.0.0";
+        return "8.0.1";
     }
 
     @Override
@@ -309,11 +313,31 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
                         //Matching operation => Check if form key match with template key
                         for (Object formKey : formSet) {
+                            //if text follows format "json[1].jsonKey", translate json array format
+                            Pattern pattern = Pattern.compile("([a-zA-Z]+)\\[(\\d+)\\]\\.(.+)");
+                            Matcher matcher = pattern.matcher(key);
+                            
+                            if (matcher.matches()) {
+                                String jsonName = matcher.group(1);
+                                String rowNum = matcher.group(2);
+                                String jsonKey = matcher.group(3);
+                      
+                                if (formKey.toString().equals(jsonName)){
+                                    String jsonString = r.getProperty(jsonName);
+                                    JSONArray jsonArray = new JSONArray(jsonString);
+
+                                    if (jsonArray.length() > Integer.parseInt(rowNum)) {
+                                        JSONObject jsonObject = jsonArray.getJSONObject(Integer.parseInt(rowNum));
+                                        String jsonValue = jsonObject.getString(jsonKey);
+                                        matchedMap.put(key, jsonValue);
+                                    }
+                                }
+                            }
+                         
                             if (formKey.toString().equals(key)) {
                                 matchedMap.put(formKey.toString(), r.getProperty(key));
                             }
                         }
-
                     }
                 }
             }
@@ -376,6 +400,27 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                         for (FormRow r : formRowSet) {
                             Set<Object> formSet = r.keySet();
                             for (Object formKey : formSet) {
+                                //if text follows format "json[1].jsonKey", translate json array format
+                                Pattern pattern = Pattern.compile("([a-zA-Z]+)\\[(\\d+)\\]\\.(.+)");
+                                Matcher matcher = pattern.matcher(key);
+                                
+                                if (matcher.matches()) {
+                                    String jsonName = matcher.group(1);
+                                    String rowNum = matcher.group(2);
+                                    String jsonKey = matcher.group(3);
+                        
+                                    if (formKey.toString().equals(jsonName)){
+                                        String jsonString = r.getProperty(jsonName);
+                                        JSONArray jsonArray = new JSONArray(jsonString);
+
+                                        if (jsonArray.length() > Integer.parseInt(rowNum)) {
+                                            JSONObject jsonObject = jsonArray.getJSONObject(Integer.parseInt(rowNum));
+                                            String jsonValue = jsonObject.getString(jsonKey);
+                                            matchedMap.put(key, jsonValue);
+                                        }
+                                    }
+                                }
+
                                 if (formKey.toString().equals(key)) {
                                     matchedMap.put(formKey.toString(), r.getProperty(key));
                                 }
