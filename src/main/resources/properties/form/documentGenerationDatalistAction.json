@@ -1,37 +1,81 @@
-[{
-        "title" : "@@datalist.DocumentGenerationDatalistAction.config@@",
-        "properties" : [{
-                "name":"templateFile",
-                "label":"@@datalist.DocumentGenerationDatalistAction.templateFile@@",
-                "type":"file",
-                "appPath":"[APP_PATH]",
-                "allowType":".docx,.doc"       
-        },
-        {
-                "name" : "formDefId",
-                "label" : "@@datalist.DocumentGenerationDatalistAction.form@@",
-                "type" : "selectbox",
-                "options_ajax" : "[CONTEXT_PATH]/web/json/console/app[APP_PATH]/forms/options",
-                "required" : "True"
-        }]    
-},
-{
-        "title" : "@@datalist.DocumentGenerationDatalistAction.imageDimension@@",
-        "properties" : [
-        {
-                "name" : "imageWidth",
-                "label" : "@@datalist.DocumentGenerationDatalistAction.imageWidth@@",
-                "type" : "textfield",
-                "description" : "@@datalist.DocumentGenerationDatalistAction.imageWidth.desc@@",
-                "required" : "True"
-        },            
-        {
-                "name" : "imageHeight",
-                "label" : "@@datalist.DocumentGenerationDatalistAction.imageHeight@@",
-                "type" : "textfield",
-                "description" : "@@datalist.DocumentGenerationDatalistAction.imageHeight.desc@@",
-                "required" : "True"
-        }]
-        
-}]
-
+[
+    {
+        "title": "@@datalist.DocumentGenerationDatalistAction.config@@",
+        "properties": [
+            {
+                "name": "templateFile",
+                "label": "@@datalist.DocumentGenerationDatalistAction.templateFile@@",
+                "type": "file",
+                "appPath": "[APP_PATH]",
+                "allowType": ".docx,.doc",
+                "required": "True"
+            },
+            {
+                "name": "formDefId",
+                "label": "@@datalist.DocumentGenerationDatalistAction.form@@",
+                "type": "selectbox",
+                "options_ajax": "[CONTEXT_PATH]/web/json/console/app[APP_PATH]/forms/options",
+                "required": "True"
+            },
+            {
+                "label": "@@datalist.DocumentGenerationDatalistAction.imageDimension@@",
+                "type": "header",
+                "description": "@@datalist.DocumentGenerationDatalistAction.imageDimension.desc@@"
+            },
+            {
+                "name": "imageWidth",
+                "label": "@@datalist.DocumentGenerationDatalistAction.imageWidth@@",
+                "type": "textfield",
+                "description": "@@datalist.DocumentGenerationDatalistAction.imageWidth.desc@@"
+            },
+            {
+                "name": "imageHeight",
+                "label": "@@datalist.DocumentGenerationDatalistAction.imageHeight@@",
+                "type": "textfield",
+                "description": "@@datalist.DocumentGenerationDatalistAction.imageHeight.desc@@"
+            },
+            {
+                "label": "@@datalist.DocumentGenerationDatalistAction.gridCustomisation@@",
+                "type": "header",
+                "description": "@@datalist.DocumentGenerationDatalistAction.gridCustomisation.desc@@"
+            },
+            {
+                "name": "gridWidth",
+                "label": "@@datalist.DocumentGenerationDatalistAction.gridWidth@@",
+                "type": "textfield",
+                "description": "@@datalist.DocumentGenerationDatalistAction.gridWidth.desc@@"
+            },
+            {
+                "name": "gridDirection",
+                "label": "@@datalist.DocumentGenerationDatalistAction.gridDirection@@",
+                "type": "selectbox",
+                "value": "",
+                "options": [
+                    {
+                        "value": "",
+                        "label": ""
+                    },
+                    {
+                        "value": "vertical",
+                        "label": "Vertical"
+                    },
+                    {
+                        "value": "horizontal",
+                        "label": "Horizontal"
+                    }
+                ]
+            },
+            {
+                "name": "gridIncludeHeader",
+                "label": "@@datalist.DocumentGenerationDatalistAction.gridIncludeHeader@@",
+                "type": "checkbox",
+                "options": [
+                    {
+                        "value": "true",
+                        "label": ""
+                    }
+                ]
+            }
+        ]
+    }
+]

@@ -4,11 +4,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.net.URLEncoder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -29,6 +31,7 @@ import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.apache.poi.xwpf.usermodel.XWPFTable.XWPFBorderType;
 import org.joget.apps.app.model.AppDefinition;
 import org.joget.apps.app.service.AppPluginUtil;
 import org.joget.apps.app.service.AppResourceUtil;
@@ -44,6 +47,11 @@ import org.joget.commons.util.LogUtil;
 import org.joget.workflow.util.WorkflowUtil;
 import org.json.JSONArray;
 import org.json.JSONObject;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 /**
  *
@@ -152,9 +160,83 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                     for (int i = paragraph.getRuns().size() - 1; i >= 0; i--) {
                         paragraph.removeRun(i);
                     }
-                    XWPFRun newRun = paragraph.createRun();
-                    newRun.setText(text);
+
+                    // if value is json
+                    if (text.contains("{") || text.contains("}") || text.contains("[") || text.contains("]")) {
+                        replacePlaceholderInJSON(text, xwpfDocument);
+                    } else {
+                        XWPFRun newRun = paragraph.createRun();
+                        newRun.setText(text);
+                    }
                 }
+            }
+        }
+    }
+
+    protected void replacePlaceholderInJSON(String text, XWPFDocument xwpfDocument) {
+        JsonArray jsonArray = JsonParser.parseString(text).getAsJsonArray();
+
+        int colIndex = 0;
+        int rowIndex = 0;
+        if (getPropertyString("gridIncludeHeader").equals("true")) {
+            rowIndex = 1;
+        }
+
+        LinkedHashSet<String> jsonKeyList = new LinkedHashSet<>();
+        ArrayList<String> jsonValueList = new ArrayList<>();
+        for (int i = 0; i < jsonArray.size(); i++) {
+            JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
+            Set<Map.Entry<String, JsonElement>> entrySet = jsonObject.entrySet();
+
+            for (Map.Entry<String, JsonElement> entryJson : entrySet) {
+                String fieldName = entryJson.getKey();
+                JsonElement fieldValue = entryJson.getValue();
+
+                // Exclude "", "id" and "__UNIQUEKEY__"
+                if (!fieldName.equals("") && !fieldName.equals("id") && !fieldName.equals("__UNIQUEKEY__")) {
+                    jsonKeyList.add(fieldName);
+                    jsonValueList.add(fieldValue.getAsString());
+                }
+            }
+        }
+
+        XWPFTable table = null;
+        if (getPropertyString("gridDirection").equals("horizontal")) {
+            table = createEmptyGridTable(jsonKeyList.size(), (jsonValueList.size() / jsonKeyList.size()) + rowIndex, xwpfDocument);
+          
+        } else if(getPropertyString("gridDirection").equals("vertical")){
+             table = createEmptyGridTable((jsonValueList.size() / jsonKeyList.size()) + rowIndex, jsonKeyList.size(), xwpfDocument);
+        }
+
+        // table header
+        if (getPropertyString("gridIncludeHeader").equals("true")) {
+            rowIndex = 0;
+            for (String jsonKey : jsonKeyList) {
+                if (getPropertyString("gridDirection").equals("horizontal")){
+                    table.getRow(rowIndex).getCell(0).setText(jsonKey);
+                } else if (getPropertyString("gridDirection").equals("vertical")){
+                     table.getRow(0).getCell(rowIndex).setText(jsonKey);
+                }
+               
+                rowIndex++;
+            }
+            colIndex = 1;
+        }
+
+        // table value
+        rowIndex = 0;
+        for (String jsonValue : jsonValueList) {
+            if (getPropertyString("gridDirection").equals("horizontal")) {
+                table.getRow(rowIndex).getCell(colIndex).setText(jsonValue);
+            } else if (getPropertyString("gridDirection").equals("vertical")) {
+                table.getRow(colIndex).getCell(rowIndex).setText(jsonValue);
+            }
+
+            if ((jsonKeyList.size() - 1) == rowIndex) {
+                rowIndex = 0;
+                colIndex++;
+            } else {
+                rowIndex++;
             }
         }
     }
@@ -254,6 +336,23 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         } else {
             return false;
         }
+    }
+
+    protected XWPFTable createEmptyGridTable(int rows, int cols, XWPFDocument xwpfDocument) {
+        XWPFTable table = xwpfDocument.createTable(rows, cols);
+        table.getCTTbl().addNewTblGrid().addNewGridCol().setW(BigInteger.valueOf(Integer.parseInt(getPropertyString("gridWidth"))));
+        for (int i = 1; i < cols; i++){
+            table.getCTTbl().getTblGrid().addNewGridCol().setW(BigInteger.valueOf(Integer.parseInt(getPropertyString("gridWidth"))));
+        }
+      
+        table.setInsideHBorder(XWPFBorderType.THICK, 5, 0, "000000");
+        table.setInsideVBorder(XWPFBorderType.THICK, 5, 0, "000000");
+        table.setTopBorder(XWPFBorderType.THICK, 5, 0, "000000");
+        table.setBottomBorder(XWPFBorderType.THICK, 5, 0, "000000");
+        table.setLeftBorder(XWPFBorderType.THICK, 5, 0, "000000");
+        table.setRightBorder(XWPFBorderType.THICK, 5, 0, "000000");
+
+        return table;
     }
 
     protected File getTempFile() throws IOException {
