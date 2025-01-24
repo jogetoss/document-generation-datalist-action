@@ -32,6 +32,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.apache.poi.xwpf.usermodel.XWPFTable.XWPFBorderType;
+import org.apache.xmlbeans.XmlCursor;
 import org.joget.apps.app.model.AppDefinition;
 import org.joget.apps.app.service.AppPluginUtil;
 import org.joget.apps.app.service.AppResourceUtil;
@@ -52,6 +53,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.util.List;
 
 /**
  *
@@ -68,7 +70,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
     @Override
     public String getVersion() {
-        return "8.0.1";
+        return "8.0.2";
     }
 
     @Override
@@ -162,8 +164,8 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                     }
 
                     // if value is json
-                    if (text.contains("{") || text.contains("}") || text.contains("[") || text.contains("]")) {
-                        replacePlaceholderInJSON(text, xwpfDocument);
+                    if (text.contains("[") || text.contains("]")) {
+                        replacePlaceholderInJSON(text, xwpfDocument, paragraph);
                     } else {
                         XWPFRun newRun = paragraph.createRun();
                         newRun.setText(text);
@@ -173,7 +175,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         }
     }
 
-    protected void replacePlaceholderInJSON(String text, XWPFDocument xwpfDocument) {
+    protected void replacePlaceholderInJSON(String text, XWPFDocument xwpfDocument, XWPFParagraph paragraph) {
         JsonArray jsonArray = JsonParser.parseString(text).getAsJsonArray();
 
         int colIndex = 0;
@@ -184,28 +186,47 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
         LinkedHashSet<String> jsonKeyList = new LinkedHashSet<>();
         ArrayList<String> jsonValueList = new ArrayList<>();
+        List<String> allKeys = new ArrayList<>();  // To track all keys encountered
+        
+        // First pass to collect all unique keys
         for (int i = 0; i < jsonArray.size(); i++) {
             JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
             Set<Map.Entry<String, JsonElement>> entrySet = jsonObject.entrySet();
-
+        
             for (Map.Entry<String, JsonElement> entryJson : entrySet) {
                 String fieldName = entryJson.getKey();
-                JsonElement fieldValue = entryJson.getValue();
-
+        
                 // Exclude "", "id" and "__UNIQUEKEY__"
                 if (!fieldName.equals("") && !fieldName.equals("id") && !fieldName.equals("__UNIQUEKEY__")) {
-                    jsonKeyList.add(fieldName);
-                    jsonValueList.add(fieldValue.getAsString());
+                    if (!jsonKeyList.contains(fieldName)) {
+                        jsonKeyList.add(fieldName);
+                        allKeys.add(fieldName);  // Add to allKeys to keep track of encountered keys
+                    }
+                }
+            }
+        }
+        
+        // Second pass to fill in jsonValueList
+        for (int i = 0; i < jsonArray.size(); i++) {
+            JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
+        
+            // For each key in allKeys, get the corresponding value or "" if missing
+            for (String key : allKeys) {
+                // Add the value or empty string if the key is not found in the current jsonObject
+                if (jsonObject.has(key)) {
+                    jsonValueList.add(jsonObject.get(key).getAsString());
+                } else {
+                    jsonValueList.add("");  // Add empty string if the key is missing
                 }
             }
         }
 
         XWPFTable table = null;
         if (getPropertyString("gridDirection").equals("horizontal")) {
-            table = createEmptyGridTable(jsonKeyList.size(), (jsonValueList.size() / jsonKeyList.size()) + rowIndex, xwpfDocument);
+            table = createEmptyGridTable(jsonKeyList.size(), (jsonValueList.size() / jsonKeyList.size()) + rowIndex, xwpfDocument, paragraph);
           
         } else if(getPropertyString("gridDirection").equals("vertical")){
-             table = createEmptyGridTable((jsonValueList.size() / jsonKeyList.size()) + rowIndex, jsonKeyList.size(), xwpfDocument);
+            table = createEmptyGridTable((jsonValueList.size() / jsonKeyList.size()) + rowIndex, jsonKeyList.size(), xwpfDocument, paragraph);
         }
 
         // table header
@@ -223,22 +244,22 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
             colIndex = 1;
         }
 
-        // table value
-        rowIndex = 0;
-        for (String jsonValue : jsonValueList) {
-            if (getPropertyString("gridDirection").equals("horizontal")) {
-                table.getRow(rowIndex).getCell(colIndex).setText(jsonValue);
-            } else if (getPropertyString("gridDirection").equals("vertical")) {
-                table.getRow(colIndex).getCell(rowIndex).setText(jsonValue);
-            }
+       // table value
+       rowIndex = 0;
+       for (String jsonValue : jsonValueList) {
+           if (getPropertyString("gridDirection").equals("horizontal")) {
+               table.getRow(rowIndex).getCell(colIndex).setText(jsonValue);
+           } else if (getPropertyString("gridDirection").equals("vertical")) {
+               table.getRow(colIndex).getCell(rowIndex).setText(jsonValue);
+           }
 
-            if ((jsonKeyList.size() - 1) == rowIndex) {
-                rowIndex = 0;
-                colIndex++;
-            } else {
-                rowIndex++;
-            }
-        }
+           if ((jsonKeyList.size() - 1) == rowIndex) {
+               rowIndex = 0;
+               colIndex++;
+           } else {
+               rowIndex++;
+           }
+       }
     }
 
     protected void replacePlaceholderInTables(Map<String, String> dataParams, XWPFDocument xwpfDocument) {
@@ -338,8 +359,22 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         }
     }
 
-    protected XWPFTable createEmptyGridTable(int rows, int cols, XWPFDocument xwpfDocument) {
-        XWPFTable table = xwpfDocument.createTable(rows, cols);
+    protected XWPFTable createEmptyGridTable(int rows, int cols, XWPFDocument xwpfDocument, XWPFParagraph paragraph) {
+        XmlCursor cursor = paragraph.getCTP().newCursor();
+        XWPFTable table = xwpfDocument.insertNewTbl(cursor);
+
+        // create rows and cols for table
+        XWPFTableRow firstRow = table.getRow(0); 
+        for (int j = 0; j < cols; j++) {
+            if (firstRow.getTableCells().size() <= j) {
+                firstRow.createCell();
+            }
+        }
+        for (int i = 1; i < rows; i++) {
+            table.createRow(); 
+        }
+
+
         table.getCTTbl().addNewTblGrid().addNewGridCol().setW(BigInteger.valueOf(Integer.parseInt(getPropertyString("gridWidth"))));
         for (int i = 1; i < cols; i++){
             table.getCTTbl().getTblGrid().addNewGridCol().setW(BigInteger.valueOf(Integer.parseInt(getPropertyString("gridWidth"))));
