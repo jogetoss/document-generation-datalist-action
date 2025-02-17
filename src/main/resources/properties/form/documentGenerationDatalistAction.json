@@ -18,6 +18,17 @@
                 "required": "True"
             },
             {
+                "name": "wordFileName",
+                "label": "@@datalist.DocumentGenerationDatalistAction.wordFileName@@",
+                "type": "textfield"
+            },
+            {
+                "name": "zipFileName",
+                "label": "@@datalist.DocumentGenerationDatalistAction.zipFileName@@",
+                "type": "textfield"
+            },
+
+            {
                 "label": "@@datalist.DocumentGenerationDatalistAction.imageDimension@@",
                 "type": "header",
                 "description": "@@datalist.DocumentGenerationDatalistAction.imageDimension.desc@@"

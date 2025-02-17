@@ -54,6 +54,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.List;
+import org.joget.apps.form.service.FormUtil;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblGrid;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblWidth;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcPr;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STJc;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblWidth;
 
 /**
  *
@@ -70,7 +76,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
     @Override
     public String getVersion() {
-        return "8.0.2";
+        return "8.0.3";
     }
 
     @Override
@@ -187,17 +193,27 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         LinkedHashSet<String> jsonKeyList = new LinkedHashSet<>();
         ArrayList<String> jsonValueList = new ArrayList<>();
         List<String> allKeys = new ArrayList<>();  // To track all keys encountered
-        
+
         // First pass to collect all unique keys
         for (int i = 0; i < jsonArray.size(); i++) {
             JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
             Set<Map.Entry<String, JsonElement>> entrySet = jsonObject.entrySet();
-        
+
             for (Map.Entry<String, JsonElement> entryJson : entrySet) {
                 String fieldName = entryJson.getKey();
-        
-                // Exclude "", "id" and "__UNIQUEKEY__"
-                if (!fieldName.equals("") && !fieldName.equals("id") && !fieldName.equals("__UNIQUEKEY__")) {
+
+                // Exclude "", "id" and "_UNIQUEKEY_"
+                if (!fieldName.equals("")
+                        && !fieldName.equals("id")
+                        && !fieldName.trim().equalsIgnoreCase("__UNIQUEKEY__")
+                        && !fieldName.equals("createdByName")
+                        && !fieldName.equals("dateCreated")
+                        && !fieldName.equals("modifiedByName")
+                        && !fieldName.equals("createdBy")
+                        && !fieldName.equals("dateModified")
+                        && !fieldName.equals("modifiedBy")
+                        && !fieldName.equals("fk")) {
+
                     if (!jsonKeyList.contains(fieldName)) {
                         jsonKeyList.add(fieldName);
                         allKeys.add(fieldName);  // Add to allKeys to keep track of encountered keys
@@ -205,11 +221,11 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                 }
             }
         }
-        
+
         // Second pass to fill in jsonValueList
         for (int i = 0; i < jsonArray.size(); i++) {
             JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
-        
+
             // For each key in allKeys, get the corresponding value or "" if missing
             for (String key : allKeys) {
                 // Add the value or empty string if the key is not found in the current jsonObject
@@ -224,7 +240,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         XWPFTable table = null;
         if (getPropertyString("gridDirection").equals("horizontal")) {
             table = createEmptyGridTable(jsonKeyList.size(), (jsonValueList.size() / jsonKeyList.size()) + rowIndex, xwpfDocument, paragraph);
-          
+
         } else if(getPropertyString("gridDirection").equals("vertical")){
             table = createEmptyGridTable((jsonValueList.size() / jsonKeyList.size()) + rowIndex, jsonKeyList.size(), xwpfDocument, paragraph);
         }
@@ -236,35 +252,37 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                 if (getPropertyString("gridDirection").equals("horizontal")){
                     table.getRow(rowIndex).getCell(0).setText(jsonKey);
                 } else if (getPropertyString("gridDirection").equals("vertical")){
-                     table.getRow(0).getCell(rowIndex).setText(jsonKey);
+                    table.getRow(0).getCell(rowIndex).setText(jsonKey);
                 }
-               
+
                 rowIndex++;
             }
             colIndex = 1;
         }
 
-       // table value
-       rowIndex = 0;
-       for (String jsonValue : jsonValueList) {
-           if (getPropertyString("gridDirection").equals("horizontal")) {
-               table.getRow(rowIndex).getCell(colIndex).setText(jsonValue);
-           } else if (getPropertyString("gridDirection").equals("vertical")) {
-               table.getRow(colIndex).getCell(rowIndex).setText(jsonValue);
-           }
+        // table value
+        rowIndex = 0;
+        for (String jsonValue : jsonValueList) {
+            if (getPropertyString("gridDirection").equals("horizontal")) {
+                table.getRow(rowIndex).getCell(colIndex).setText(jsonValue);
+            } else if (getPropertyString("gridDirection").equals("vertical")) {
+                table.getRow(colIndex).getCell(rowIndex).setText(jsonValue);
+            }
 
-           if ((jsonKeyList.size() - 1) == rowIndex) {
-               rowIndex = 0;
-               colIndex++;
-           } else {
-               rowIndex++;
-           }
-       }
+            if ((jsonKeyList.size() - 1) == rowIndex) {
+                rowIndex = 0;
+                colIndex++;
+            } else {
+                rowIndex++;
+            }
+        }
     }
 
     protected void replacePlaceholderInTables(Map<String, String> dataParams, XWPFDocument xwpfDocument) {
         for (Map.Entry<String, String> entry : dataParams.entrySet()) {
             for (XWPFTable xwpfTable : xwpfDocument.getTables()) {
+                xwpfTable.getCTTbl().getTblPr().addNewJc().setVal(STJc.CENTER);
+
                 for (XWPFTableRow xwpfTableRow : xwpfTable.getRows()) {
                     for (XWPFTableCell xwpfTableCell : xwpfTableRow.getTableCells()) {
                         for (XWPFParagraph xwpfParagraph : xwpfTableCell.getParagraphs()) {
@@ -279,6 +297,34 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    protected void fixPreCreatedTableFormatting(XWPFDocument xwpfDocument) {
+        for (XWPFTable table : xwpfDocument.getTables()) {
+            // Ensure center alignment
+            table.getCTTbl().getTblPr().addNewJc().setVal(STJc.CENTER);
+
+            // Adjust column widths dynamically
+            int numCols = table.getRow(0).getTableCells().size();
+            int gridWidth = Integer.parseInt(getPropertyString("gridWidth"));
+            BigInteger columnWidth = BigInteger.valueOf(gridWidth / numCols);
+
+            // Define table grid
+            CTTblGrid tblGrid = table.getCTTbl().addNewTblGrid();
+            for (int i = 0; i < numCols; i++) {
+                tblGrid.addNewGridCol().setW(columnWidth);
+            }
+
+            // Apply column width to each cell
+            for (XWPFTableRow row : table.getRows()) {
+                for (XWPFTableCell cell : row.getTableCells()) {
+                    CTTcPr tcPr = cell.getCTTc().addNewTcPr();
+                    CTTblWidth cellWidth = tcPr.addNewTcW();
+                    cellWidth.setW(columnWidth);
+                    cellWidth.setType(STTblWidth.DXA);
                 }
             }
         }
@@ -334,7 +380,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                                         }
                                         int width = Integer.parseInt(getPropertyString("imageWidth"));
                                         int height = Integer.parseInt(getPropertyString("imageHeight"));
-                                        
+
                                         XWPFRun newRun = xwpfParagraph.createRun();
                                         newRun.addPicture(fileInputStream, Document.PICTURE_TYPE_JPEG, row + "_image", Units.toEMU(width), Units.toEMU(height));
                                         fileInputStream.close();
@@ -363,23 +409,36 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         XmlCursor cursor = paragraph.getCTP().newCursor();
         XWPFTable table = xwpfDocument.insertNewTbl(cursor);
 
-        // create rows and cols for table
-        XWPFTableRow firstRow = table.getRow(0); 
-        for (int j = 0; j < cols; j++) {
-            if (firstRow.getTableCells().size() <= j) {
-                firstRow.createCell();
+        table.getCTTbl().getTblPr().addNewJc().setVal(STJc.CENTER);
+
+        // Dynamically set grid width based on user property
+        int gridWidth = Integer.parseInt(getPropertyString("gridWidth"));
+        BigInteger columnWidth = BigInteger.valueOf(gridWidth);
+        CTTblGrid tblGrid = table.getCTTbl().addNewTblGrid();
+        for (int i = 0; i < cols; i++) {
+            tblGrid.addNewGridCol().setW(columnWidth);
+        }
+
+        // Create rows and columns dynamically
+        for (int i = 0; i < rows; i++) {
+            XWPFTableRow row = (i == 0) ? table.getRow(0) : table.createRow();
+            for (int j = 0; j < cols; j++) {
+                if (row.getTableCells().size() <= j) {
+                    row.createCell();
+                }
             }
         }
-        for (int i = 1; i < rows; i++) {
-            table.createRow(); 
+
+        // Set margins inside the table cells for better spacing
+        for (XWPFTableRow row : table.getRows()) {
+            for (XWPFTableCell cell : row.getTableCells()) {
+                CTTcPr tcPr = cell.getCTTc().addNewTcPr();
+                CTTblWidth cellWidth = tcPr.addNewTcW();
+                cellWidth.setW(columnWidth);
+                cellWidth.setType(STTblWidth.DXA);
+            }
         }
 
-
-        table.getCTTbl().addNewTblGrid().addNewGridCol().setW(BigInteger.valueOf(Integer.parseInt(getPropertyString("gridWidth"))));
-        for (int i = 1; i < cols; i++){
-            table.getCTTbl().getTblGrid().addNewGridCol().setW(BigInteger.valueOf(Integer.parseInt(getPropertyString("gridWidth"))));
-        }
-      
         table.setInsideHBorder(XWPFBorderType.THICK, 5, 0, "000000");
         table.setInsideVBorder(XWPFBorderType.THICK, 5, 0, "000000");
         table.setTopBorder(XWPFBorderType.THICK, 5, 0, "000000");
@@ -409,9 +468,36 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
         AppDefinition appDef = AppUtil.getCurrentAppDefinition();
         String formDef = getPropertyString("formDefId");
-        AppService appService = (AppService) AppUtil.getApplicationContext().getBean("appService");
 
-        FormRowSet formRowSet = appService.loadFormData(appDef.getAppId(), appDef.getVersion().toString(), formDef, row);
+        // Get form data with subform information
+        Map<String, Object> formData = FormUtil.loadFormData(
+                appDef.getAppId(),
+                appDef.getVersion().toString(),
+                formDef,
+                row,
+                true, // includeSubformData
+                true, // includeReferenceElements
+                false, // flatten
+                null // no workflow assignment
+        );
+
+        // Convert formData to array format
+        FormRowSet formDataRowSet = new FormRowSet();
+        FormRow dataRow = new FormRow();
+        // Handle each entry in the form data
+        for (Map.Entry<String, Object> entry : formData.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (value instanceof List) {
+                // Convert HashMap structure to JSON string
+                String jsonValue = convertHashMapToJson(value);
+                dataRow.put(key, jsonValue);
+            } else {
+                dataRow.put(key, value != null ? value.toString() : "");
+            }
+        }
+        formDataRowSet.add(dataRow);
 
         try {
             File tempFile = getTempFile();
@@ -419,18 +505,14 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
             //Create a XWPFDocument object
             XWPFDocument apachDoc = new XWPFDocument(fInputStream);
-            XWPFWordExtractor extractor = new XWPFWordExtractor(apachDoc);
+            fixPreCreatedTableFormatting(apachDoc);
 
-            //Extracted Text stored in a String 
+            XWPFWordExtractor extractor = new XWPFWordExtractor(apachDoc);
             String text = extractor.getText();
             extractor.close();
 
-            //File Text Array & ArrayList (After regex)
-            String[] textArr;
-            ArrayList<String> textArrayList = new ArrayList<String>();
-
-            //Remove all whitespaces in extracted text
-            textArr = text.split("\\s+");
+            ArrayList<String> textArrayList = new ArrayList<>();
+            String[] textArr = text.split("\\s+");
             for (String x : textArr) {
                 if (x.startsWith("${") && x.endsWith("}")) {
                     textArrayList.add(x.substring(2, x.length() - 1));
@@ -439,9 +521,9 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
             //Perform Matching Operation
             Map<String, String> matchedMap = new HashMap<>();
-            if (formRowSet != null && !formRowSet.isEmpty()) {
+            if (formDataRowSet != null && !formDataRowSet.isEmpty()) {
                 for (String key : textArrayList) {
-                    for (FormRow r : formRowSet) {
+                    for (FormRow r : formDataRowSet) {
                         //The keyset of the formrow
                         Set<Object> formSet = r.keySet();
 
@@ -450,14 +532,14 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                             //if text follows format "json[1].jsonKey", translate json array format
                             Pattern pattern = Pattern.compile("([a-zA-Z]+)\\[(\\d+)\\]\\.(.+)");
                             Matcher matcher = pattern.matcher(key);
-                            
+
                             if (matcher.matches()) {
                                 String jsonName = matcher.group(1);
                                 String rowNum = matcher.group(2);
                                 String jsonKey = matcher.group(3);
-                      
-                                if (formKey.toString().equals(jsonName)){
+                                if (formKey.toString().equals(jsonName)) {
                                     String jsonString = r.getProperty(jsonName);
+
                                     JSONArray jsonArray = new JSONArray(jsonString);
 
                                     if (jsonArray.length() > Integer.parseInt(rowNum)) {
@@ -467,8 +549,9 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                                     }
                                 }
                             }
-                         
+
                             if (formKey.toString().equals(key)) {
+                                String value = r.getProperty(key);
                                 matchedMap.put(formKey.toString(), r.getProperty(key));
                             }
                         }
@@ -482,7 +565,14 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
             replaceImageInParagraph(matchedMap, apachDoc, row);
             replaceImageInTable(matchedMap, apachDoc, row);
 
-            writeResponseSingle(request, response, apachDoc, row + ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+            String customFileName = getPropertyString("wordFileName");
+            if (customFileName == null || customFileName.isEmpty()) {
+                customFileName = "Doc File";
+            }
+            customFileName = customFileName.replace("{row}", row) + ".docx"; 
+
+            writeResponseSingle(request, response, apachDoc, customFileName,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
         } catch (Exception e) {
             LogUtil.error(this.getClassName(), e, e.toString());
@@ -498,51 +588,76 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         for (String row : rows) {
             AppDefinition appDef = AppUtil.getCurrentAppDefinition();
             String formDef = getPropertyString("formDefId");
-            AppService appService = (AppService) AppUtil.getApplicationContext().getBean("appService");
-            //To get whole row of the datalist
-            FormRowSet formRowSet = appService.loadFormData(appDef.getAppId(), appDef.getVersion().toString(), formDef, row);
+
+            // Get form data with subform information
+            Map<String, Object> formData = FormUtil.loadFormData(
+                    appDef.getAppId(),
+                    appDef.getVersion().toString(),
+                    formDef,
+                    row,
+                    true, // includeSubformData
+                    true, // includeReferenceElements
+                    false, // flatten
+                    null // no workflow assignment
+            );
+
+            // Convert formData to array format
+            FormRowSet formDataRowSet = new FormRowSet();
+            FormRow dataRow = new FormRow();
+            // Handle each entry in the form data
+            for (Map.Entry<String, Object> entry : formData.entrySet()) {
+                String key = entry.getKey();
+                Object value = entry.getValue();
+
+                if (value instanceof List) {
+                    // Convert HashMap structure to JSON string
+                    String jsonValue = convertHashMapToJson(value);
+                    dataRow.put(key, jsonValue);
+                } else {
+                    dataRow.put(key, value != null ? value.toString() : "");
+                }
+            }
+            formDataRowSet.add(dataRow);
 
             try {
-
                 File tempFile = getTempFile();
                 InputStream fInputStream = new FileInputStream(tempFile);
 
-                //XWPFDocument 
+                // XWPFDocument 
                 XWPFDocument apachDoc = new XWPFDocument(fInputStream);
+                fixPreCreatedTableFormatting(apachDoc);
+
                 XWPFWordExtractor extractor = new XWPFWordExtractor(apachDoc);
 
-                //Extracted Text stored in String 
+                // Extracted Text stored in String 
                 String text = extractor.getText();
                 extractor.close();
 
-                //File Text Array & ArrayList (After regex)
-                String[] textArr;
+                // File Text Array & ArrayList (After regex)
                 ArrayList<String> textArrayList = new ArrayList<>();
-
-                //Remove all whitespaces in extracted text
-                textArr = text.split("\\s+");
+                String[] textArr = text.split("\\s+");
                 for (String x : textArr) {
                     if (x.startsWith("${") && x.endsWith("}")) {
                         textArrayList.add(x.substring(2, x.length() - 1));
                     }
                 }
 
-                //Matching Operation
-                Map<String, String> matchedMap = new HashMap<String, String>();
-                if (formRowSet != null && !formRowSet.isEmpty()) {
+                // Matching Operation
+                Map<String, String> matchedMap = new HashMap<>();
+                if (formDataRowSet != null && !formDataRowSet.isEmpty()) {
                     for (String key : textArrayList) {
-                        for (FormRow r : formRowSet) {
+                        for (FormRow r : formDataRowSet) {
                             Set<Object> formSet = r.keySet();
                             for (Object formKey : formSet) {
                                 //if text follows format "json[1].jsonKey", translate json array format
                                 Pattern pattern = Pattern.compile("([a-zA-Z]+)\\[(\\d+)\\]\\.(.+)");
                                 Matcher matcher = pattern.matcher(key);
-                                
+
                                 if (matcher.matches()) {
                                     String jsonName = matcher.group(1);
                                     String rowNum = matcher.group(2);
                                     String jsonKey = matcher.group(3);
-                        
+
                                     if (formKey.toString().equals(jsonName)){
                                         String jsonString = r.getProperty(jsonName);
                                         JSONArray jsonArray = new JSONArray(jsonString);
@@ -556,6 +671,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                                 }
 
                                 if (formKey.toString().equals(key)) {
+                                    String value = r.getProperty(key);
                                     matchedMap.put(formKey.toString(), r.getProperty(key));
                                 }
                             }
@@ -576,8 +692,15 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
     protected void writeResponseMulti(HttpServletRequest request, HttpServletResponse response, ArrayList<XWPFDocument> apachDocs, String[] rows) throws IOException, ServletException {
         response.setContentType("application/zip");
-        response.setHeader("Content-Disposition", "attachment; filename=WordFiles.zip");
-        try ( ZipOutputStream zipOutputStream = new ZipOutputStream(response.getOutputStream())) {
+        String customZipName = getPropertyString("zipFileName");
+        if (customZipName == null || customZipName.isEmpty()) {
+            customZipName = "Wordfile.zip";
+        } else {
+            customZipName = customZipName.replace("{timestamp}", String.valueOf(System.currentTimeMillis())) + ".zip";
+        }
+
+        response.setHeader("Content-Disposition", "attachment; filename=" + customZipName);
+        try (ZipOutputStream zipOutputStream = new ZipOutputStream(response.getOutputStream())) {
             for (int i = 0; i < apachDocs.size(); i++) {
                 ZipEntry zipEntry = new ZipEntry(rows[i] + ".docx");
                 zipOutputStream.putNextEntry(zipEntry);
@@ -603,5 +726,28 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
             apachDoc.close();
             outputStream.flush();
         }
+    }
+    
+    public String convertHashMapToJson(Object data) {
+        if (data instanceof List) {
+            try {
+                // Convert the List<Map> structure to a JSONArray
+                JSONArray jsonArray = new JSONArray();
+                List<?> dataList = (List<?>) data;
+
+                for (Object item : dataList) {
+                    if (item instanceof Map) {
+                        JSONObject jsonObject = new JSONObject((Map<?, ?>) item);
+                        jsonArray.put(jsonObject);
+                    }
+                }
+
+                return jsonArray.toString();
+            } catch (Exception e) {
+                LogUtil.error(getClassName(), e, "Error converting List to JSON");
+            }
+        }
+
+        return data.toString();
     }
 }
