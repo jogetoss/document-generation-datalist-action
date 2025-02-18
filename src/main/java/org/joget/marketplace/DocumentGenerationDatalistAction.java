@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.URLEncoder;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -203,7 +204,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                 String fieldName = entryJson.getKey();
 
                 // Exclude "", "id" and "_UNIQUEKEY_"
-                if (!fieldName.equals("")
+                if (!fieldName.isEmpty()
                         && !fieldName.equals("id")
                         && !fieldName.trim().equalsIgnoreCase("__UNIQUEKEY__")
                         && !fieldName.equals("createdByName")
@@ -214,8 +215,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                         && !fieldName.equals("modifiedBy")
                         && !fieldName.equals("fk")) {
 
-                    if (!jsonKeyList.contains(fieldName)) {
-                        jsonKeyList.add(fieldName);
+                    if (jsonKeyList.add(fieldName)) {
                         allKeys.add(fieldName);  // Add to allKeys to keep track of encountered keys
                     }
                 }
@@ -501,7 +501,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
         try {
             File tempFile = getTempFile();
-            InputStream fInputStream = new FileInputStream(tempFile);
+            InputStream fInputStream = Files.newInputStream(tempFile.toPath());
 
             //Create a XWPFDocument object
             XWPFDocument apachDoc = new XWPFDocument(fInputStream);
@@ -521,7 +521,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
             //Perform Matching Operation
             Map<String, String> matchedMap = new HashMap<>();
-            if (formDataRowSet != null && !formDataRowSet.isEmpty()) {
+            if (!formDataRowSet.isEmpty()) {
                 for (String key : textArrayList) {
                     for (FormRow r : formDataRowSet) {
                         //The keyset of the formrow
@@ -530,7 +530,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
                         //Matching operation => Check if form key match with template key
                         for (Object formKey : formSet) {
                             //if text follows format "json[1].jsonKey", translate json array format
-                            Pattern pattern = Pattern.compile("([a-zA-Z]+)\\[(\\d+)\\]\\.(.+)");
+                            Pattern pattern = Pattern.compile("([a-zA-Z]+)\\[(\\d+)]\\.(.+)");
                             Matcher matcher = pattern.matcher(key);
 
                             if (matcher.matches()) {
@@ -571,8 +571,8 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
             }
             customFileName = customFileName.replace("{row}", row) + ".docx"; 
 
-            writeResponseSingle(request, response, apachDoc, customFileName,
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+            writeResponseSingle(request, response, apachDoc, customFileName
+            );
 
         } catch (Exception e) {
             LogUtil.error(this.getClassName(), e, e.toString());
@@ -621,59 +621,44 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
             try {
                 File tempFile = getTempFile();
-                InputStream fInputStream = new FileInputStream(tempFile);
+                InputStream fInputStream = Files.newInputStream(tempFile.toPath());
 
                 // XWPFDocument 
                 XWPFDocument apachDoc = new XWPFDocument(fInputStream);
                 fixPreCreatedTableFormatting(apachDoc);
 
-                XWPFWordExtractor extractor = new XWPFWordExtractor(apachDoc);
-
-                // Extracted Text stored in String 
-                String text = extractor.getText();
-                extractor.close();
-
-                // File Text Array & ArrayList (After regex)
-                ArrayList<String> textArrayList = new ArrayList<>();
-                String[] textArr = text.split("\\s+");
-                for (String x : textArr) {
-                    if (x.startsWith("${") && x.endsWith("}")) {
-                        textArrayList.add(x.substring(2, x.length() - 1));
-                    }
-                }
+                ArrayList<String> textArrayList = getStrings(apachDoc);
 
                 // Matching Operation
                 Map<String, String> matchedMap = new HashMap<>();
-                if (formDataRowSet != null && !formDataRowSet.isEmpty()) {
-                    for (String key : textArrayList) {
-                        for (FormRow r : formDataRowSet) {
-                            Set<Object> formSet = r.keySet();
-                            for (Object formKey : formSet) {
-                                //if text follows format "json[1].jsonKey", translate json array format
-                                Pattern pattern = Pattern.compile("([a-zA-Z]+)\\[(\\d+)\\]\\.(.+)");
-                                Matcher matcher = pattern.matcher(key);
+                for (String key : textArrayList) {
+                    for (FormRow r : formDataRowSet) {
+                        Set<Object> formSet = r.keySet();
+                        for (Object formKey : formSet) {
+                            //if text follows format "json[1].jsonKey", translate json array format
+                            Pattern pattern = Pattern.compile("([a-zA-Z]+)\\[(\\d+)]\\.(.+)");
+                            Matcher matcher = pattern.matcher(key);
 
-                                if (matcher.matches()) {
-                                    String jsonName = matcher.group(1);
-                                    String rowNum = matcher.group(2);
-                                    String jsonKey = matcher.group(3);
+                            if (matcher.matches()) {
+                                String jsonName = matcher.group(1);
+                                String rowNum = matcher.group(2);
+                                String jsonKey = matcher.group(3);
 
-                                    if (formKey.toString().equals(jsonName)){
-                                        String jsonString = r.getProperty(jsonName);
-                                        JSONArray jsonArray = new JSONArray(jsonString);
+                                if (formKey.toString().equals(jsonName)) {
+                                    String jsonString = r.getProperty(jsonName);
+                                    JSONArray jsonArray = new JSONArray(jsonString);
 
-                                        if (jsonArray.length() > Integer.parseInt(rowNum)) {
-                                            JSONObject jsonObject = jsonArray.getJSONObject(Integer.parseInt(rowNum));
-                                            String jsonValue = jsonObject.getString(jsonKey);
-                                            matchedMap.put(key, jsonValue);
-                                        }
+                                    if (jsonArray.length() > Integer.parseInt(rowNum)) {
+                                        JSONObject jsonObject = jsonArray.getJSONObject(Integer.parseInt(rowNum));
+                                        String jsonValue = jsonObject.getString(jsonKey);
+                                        matchedMap.put(key, jsonValue);
                                     }
                                 }
+                            }
 
-                                if (formKey.toString().equals(key)) {
-                                    String value = r.getProperty(key);
-                                    matchedMap.put(formKey.toString(), r.getProperty(key));
-                                }
+                            if (formKey.toString().equals(key)) {
+                                // String value = r.getProperty(key);
+                                matchedMap.put(formKey.toString(), r.getProperty(key));
                             }
                         }
                     }
@@ -688,6 +673,24 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
             }
         }
         writeResponseMulti(request, response, documents, rows);
+    }
+
+    private static ArrayList<String> getStrings(XWPFDocument apachDoc) throws IOException {
+        XWPFWordExtractor extractor = new XWPFWordExtractor(apachDoc);
+
+        // Extracted Text stored in String
+        String text = extractor.getText();
+        extractor.close();
+
+        // File Text Array & ArrayList (After regex)
+        ArrayList<String> textArrayList = new ArrayList<>();
+        String[] textArr = text.split("\\s+");
+        for (String x : textArr) {
+            if (x.startsWith("${") && x.endsWith("}")) {
+                textArrayList.add(x.substring(2, x.length() - 1));
+            }
+        }
+        return textArrayList;
     }
 
     protected void writeResponseMulti(HttpServletRequest request, HttpServletResponse response, ArrayList<XWPFDocument> apachDocs, String[] rows) throws IOException, ServletException {
@@ -714,12 +717,12 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         }
     }
 
-    protected void writeResponseSingle(HttpServletRequest request, HttpServletResponse response, XWPFDocument apachDoc, String fileName, String contentType) throws IOException, ServletException {
+    protected void writeResponseSingle(HttpServletRequest request, HttpServletResponse response, XWPFDocument apachDoc, String fileName) throws IOException, ServletException {
         ServletOutputStream outputStream = response.getOutputStream();
         try {
             String name = URLEncoder.encode(fileName, "UTF8").replaceAll("\\+", "%20");
             response.setHeader("Content-Disposition", "attachment;filename=" + name + ";filename*=UTF-8''" + name);
-            response.setContentType(contentType + "; charset=UTF-8");
+            response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document" + "; charset=UTF-8");
             apachDoc.write(outputStream);
 
         } finally {
