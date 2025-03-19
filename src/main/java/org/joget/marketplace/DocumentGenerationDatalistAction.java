@@ -11,7 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -34,7 +34,9 @@ import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.apache.poi.xwpf.usermodel.XWPFTable.XWPFBorderType;
 import org.apache.xmlbeans.XmlCursor;
+import org.joget.apps.app.dao.FormDefinitionDao;
 import org.joget.apps.app.model.AppDefinition;
+import org.joget.apps.app.model.FormDefinition;
 import org.joget.apps.app.service.AppPluginUtil;
 import org.joget.apps.app.service.AppResourceUtil;
 import org.joget.apps.app.service.AppService;
@@ -51,7 +53,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.List;
@@ -77,7 +78,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
     @Override
     public String getVersion() {
-        return "8.0.3";
+        return "8.0.4";
     }
 
     @Override
@@ -183,98 +184,95 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
     }
 
     protected void replacePlaceholderInJSON(String text, XWPFDocument xwpfDocument, XWPFParagraph paragraph) {
+        AppDefinition appDef = AppUtil.getCurrentAppDefinition();
+        String formDef = getPropertyString("formDefId");
+        FormDefinitionDao formDefinitionDao = (FormDefinitionDao) FormUtil.getApplicationContext().getBean("formDefinitionDao");
+        FormDefinition formDefinition = formDefinitionDao.loadById(formDef, appDef);
+    
+        LinkedHashMap<String, String> headerMap = new LinkedHashMap<>();
+        if (formDefinition != null) {
+            JSONObject rootObject = new JSONObject(formDefinition.getJson());
+            extractHeaderMapFromGrid(rootObject, headerMap);
+        }
         JsonArray jsonArray = JsonParser.parseString(text).getAsJsonArray();
+    
+        boolean includeHeader = "true".equals(getPropertyString("gridIncludeHeader"));
+        List<String> orderedKeys = new ArrayList<>(headerMap.keySet());
+        List<List<String>> tableData = new ArrayList<>();
+    
+        for (int i = 0; i < jsonArray.size(); i++) {
+            JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
+            List<String> rowValues = new ArrayList<>();
+    
+            for (String key : orderedKeys) {
+                rowValues.add(jsonObject.has(key) ? jsonObject.get(key).getAsString() : "");
+            }
+    
+            tableData.add(rowValues);
+        }
+    
+        // create table
+        int rowCount = tableData.size() + (includeHeader ? 1 : 0);
+        int colCount = orderedKeys.size();
 
-        int colIndex = 0;
+        XWPFTable table;
+        if ("vertical".equals(getPropertyString("gridDirection"))) {
+            table = createEmptyGridTable(rowCount, colCount, xwpfDocument, paragraph);
+        } else {
+            table = createEmptyGridTable(colCount, rowCount, xwpfDocument, paragraph);
+        }
+
         int rowIndex = 0;
-        if (getPropertyString("gridIncludeHeader").equals("true")) {
-            rowIndex = 1;
-        }
+        
+        // insert table header
+        if (includeHeader) {
+            int colIndex = 0;
+            for (String key : orderedKeys) {
+                String headerLabel = headerMap.getOrDefault(key, key);
 
-        LinkedHashSet<String> jsonKeyList = new LinkedHashSet<>();
-        ArrayList<String> jsonValueList = new ArrayList<>();
-        List<String> allKeys = new ArrayList<>();  // To track all keys encountered
-
-        // First pass to collect all unique keys
-        for (int i = 0; i < jsonArray.size(); i++) {
-            JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
-            Set<Map.Entry<String, JsonElement>> entrySet = jsonObject.entrySet();
-
-            for (Map.Entry<String, JsonElement> entryJson : entrySet) {
-                String fieldName = entryJson.getKey();
-
-                // Exclude "", "id" and "_UNIQUEKEY_"
-                if (!fieldName.isEmpty()
-                        && !fieldName.equals("id")
-                        && !fieldName.trim().equalsIgnoreCase("__UNIQUEKEY__")
-                        && !fieldName.equals("createdByName")
-                        && !fieldName.equals("dateCreated")
-                        && !fieldName.equals("modifiedByName")
-                        && !fieldName.equals("createdBy")
-                        && !fieldName.equals("dateModified")
-                        && !fieldName.equals("modifiedBy")
-                        && !fieldName.equals("fk")) {
-
-                    if (jsonKeyList.add(fieldName)) {
-                        allKeys.add(fieldName);  // Add to allKeys to keep track of encountered keys
-                    }
+                if (table.getRow(rowIndex) == null) {
+                    table.createRow();
                 }
-            }
-        }
 
-        // Second pass to fill in jsonValueList
-        for (int i = 0; i < jsonArray.size(); i++) {
-            JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
+                if (table.getRow(rowIndex).getCell(colIndex) == null) {
+                    table.getRow(rowIndex).createCell();
+                }
 
-            // For each key in allKeys, get the corresponding value or "" if missing
-            for (String key : allKeys) {
-                // Add the value or empty string if the key is not found in the current jsonObject
-                if (jsonObject.has(key)) {
-                    jsonValueList.add(jsonObject.get(key).getAsString());
+                if ("vertical".equals(getPropertyString("gridDirection"))) {
+                    table.getRow(rowIndex).getCell(colIndex).setText(headerLabel);
                 } else {
-                    jsonValueList.add("");  // Add empty string if the key is missing
-                }
-            }
-        }
-
-        XWPFTable table = null;
-        if (getPropertyString("gridDirection").equals("horizontal")) {
-            table = createEmptyGridTable(jsonKeyList.size(), (jsonValueList.size() / jsonKeyList.size()) + rowIndex, xwpfDocument, paragraph);
-
-        } else if(getPropertyString("gridDirection").equals("vertical")){
-            table = createEmptyGridTable((jsonValueList.size() / jsonKeyList.size()) + rowIndex, jsonKeyList.size(), xwpfDocument, paragraph);
-        }
-
-        // table header
-        if (getPropertyString("gridIncludeHeader").equals("true")) {
-            rowIndex = 0;
-            for (String jsonKey : jsonKeyList) {
-                if (getPropertyString("gridDirection").equals("horizontal")){
-                    table.getRow(rowIndex).getCell(0).setText(jsonKey);
-                } else if (getPropertyString("gridDirection").equals("vertical")){
-                    table.getRow(0).getCell(rowIndex).setText(jsonKey);
+                    table.getRow(colIndex).getCell(rowIndex).setText(headerLabel);
                 }
 
-                rowIndex++;
-            }
-            colIndex = 1;
-        }
-
-        // table value
-        rowIndex = 0;
-        for (String jsonValue : jsonValueList) {
-            if (getPropertyString("gridDirection").equals("horizontal")) {
-                table.getRow(rowIndex).getCell(colIndex).setText(jsonValue);
-            } else if (getPropertyString("gridDirection").equals("vertical")) {
-                table.getRow(colIndex).getCell(rowIndex).setText(jsonValue);
-            }
-
-            if ((jsonKeyList.size() - 1) == rowIndex) {
-                rowIndex = 0;
                 colIndex++;
-            } else {
-                rowIndex++;
             }
+            rowIndex++;
+        }
+
+        // insert table values
+        for (List<String> row : tableData) {
+            int colIndex = 0;
+
+            // Ensure row exists
+            if (table.getRow(rowIndex) == null) {
+                table.createRow();
+            }
+
+            for (String value : row) {
+                // Ensure cell exists
+                if (table.getRow(rowIndex).getCell(colIndex) == null) {
+                    table.getRow(rowIndex).createCell();
+                }
+
+                if ("vertical".equals(getPropertyString("gridDirection"))) {
+                    table.getRow(rowIndex).getCell(colIndex).setText(value);
+                } else {
+                    table.getRow(colIndex).getCell(rowIndex).setText(value);
+                }
+
+                colIndex++;
+            }
+            rowIndex++;
         }
     }
 
@@ -301,6 +299,48 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
             }
         }
     }
+
+    protected void extractHeaderMapFromGrid(JSONObject jsonObject, LinkedHashMap<String, String> headerMap) {
+        if (jsonObject.has("elements") && jsonObject.get("elements") instanceof JSONArray) {
+            JSONArray elementsArray = jsonObject.getJSONArray("elements");
+    
+            for (int i = 0; i < elementsArray.length(); i++) {
+                JSONObject element = elementsArray.getJSONObject(i);
+    
+                if (element.has("className")) {
+                    String className = element.getString("className");
+    
+                    // only for grid types
+                    if (className.equals("org.joget.plugin.enterprise.AdvancedGrid") ||
+                        className.equals("org.joget.plugin.enterprise.FormGrid") ||
+                        className.equals("org.joget.plugin.enterprise.ListGrid")) {
+    
+                        if (element.has("properties")) {
+                            JSONObject properties = element.getJSONObject("properties");
+    
+                            if (properties.has("options")) {
+                                Object options = properties.get("options");
+                                if (options instanceof JSONArray) {
+                                    JSONArray optionsArray = (JSONArray) options;
+                                    for (int j = 0; j < optionsArray.length(); j++) {
+                                        JSONObject option = optionsArray.getJSONObject(j);
+                                        if (option.has("value") && option.has("label")) {
+                                            headerMap.put(option.getString("value"), option.getString("label"));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                extractHeaderMapFromGrid(element, headerMap);
+            }
+        }
+    }
+    
+    
+
 
     protected void fixPreCreatedTableFormatting(XWPFDocument xwpfDocument) {
         for (XWPFTable table : xwpfDocument.getTables()) {
@@ -728,6 +768,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         } finally {
             apachDoc.close();
             outputStream.flush();
+            outputStream.close();
         }
     }
     

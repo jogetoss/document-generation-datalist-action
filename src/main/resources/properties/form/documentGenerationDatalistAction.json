@@ -3,6 +3,13 @@
         "title": "@@datalist.DocumentGenerationDatalistAction.config@@",
         "properties": [
             {
+                "label":"@@datalist.DocumentGenerationDatalistAction.label@@",
+                "name":"label",
+                "type":"textfield",
+                "value":"@@datalist.DocumentGenerationDatalistAction.label.value@@",
+                "required":"true"
+             },
+            {
                 "name": "templateFile",
                 "label": "@@datalist.DocumentGenerationDatalistAction.templateFile@@",
                 "type": "file",
@@ -17,17 +24,6 @@
                 "options_ajax": "[CONTEXT_PATH]/web/json/console/app[APP_PATH]/forms/options",
                 "required": "True"
             },
-            {
-                "name": "wordFileName",
-                "label": "@@datalist.DocumentGenerationDatalistAction.wordFileName@@",
-                "type": "textfield"
-            },
-            {
-                "name": "zipFileName",
-                "label": "@@datalist.DocumentGenerationDatalistAction.zipFileName@@",
-                "type": "textfield"
-            },
-
             {
                 "label": "@@datalist.DocumentGenerationDatalistAction.imageDimension@@",
                 "type": "header",
@@ -86,6 +82,20 @@
                         "label": ""
                     }
                 ]
+            },
+            {
+                "label": "@@datalist.DocumentGenerationDatalistAction.modifyExportedFile@@",
+                "type": "header"            
+            },
+            {
+                "name": "wordFileName",
+                "label": "@@datalist.DocumentGenerationDatalistAction.wordFileName@@",
+                "type": "textfield"
+            },
+            {
+                "name": "zipFileName",
+                "label": "@@datalist.DocumentGenerationDatalistAction.zipFileName@@",
+                "type": "textfield"
             }
         ]
     }
