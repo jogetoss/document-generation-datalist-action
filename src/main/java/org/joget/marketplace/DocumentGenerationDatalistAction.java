@@ -764,6 +764,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
         } finally {
             apachDoc.close();
             outputStream.flush();
+            outputStream.close();
         }
     }
     
