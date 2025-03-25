@@ -78,7 +78,7 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
     @Override
     public String getVersion() {
-        return "8.0.5";
+        return "8.0.6";
     }
 
     @Override
@@ -349,22 +349,24 @@ public class DocumentGenerationDatalistAction extends DataListActionDefault {
 
             // Adjust column widths dynamically
             int numCols = table.getRow(0).getTableCells().size();
-            int gridWidth = Integer.parseInt(getPropertyString("gridWidth"));
-            BigInteger columnWidth = BigInteger.valueOf(gridWidth / numCols);
-
-            // Define table grid
-            CTTblGrid tblGrid = table.getCTTbl().addNewTblGrid();
-            for (int i = 0; i < numCols; i++) {
-                tblGrid.addNewGridCol().setW(columnWidth);
-            }
-
-            // Apply column width to each cell
-            for (XWPFTableRow row : table.getRows()) {
-                for (XWPFTableCell cell : row.getTableCells()) {
-                    CTTcPr tcPr = cell.getCTTc().addNewTcPr();
-                    CTTblWidth cellWidth = tcPr.addNewTcW();
-                    cellWidth.setW(columnWidth);
-                    cellWidth.setType(STTblWidth.DXA);
+            if (getPropertyString("gridWidth") != "") {
+                int gridWidth = Integer.parseInt(getPropertyString("gridWidth"));
+                BigInteger columnWidth = BigInteger.valueOf(gridWidth / numCols);
+    
+                // Define table grid
+                CTTblGrid tblGrid = table.getCTTbl().addNewTblGrid();
+                for (int i = 0; i < numCols; i++) {
+                    tblGrid.addNewGridCol().setW(columnWidth);
+                }
+    
+                // Apply column width to each cell
+                for (XWPFTableRow row : table.getRows()) {
+                    for (XWPFTableCell cell : row.getTableCells()) {
+                        CTTcPr tcPr = cell.getCTTc().addNewTcPr();
+                        CTTblWidth cellWidth = tcPr.addNewTcW();
+                        cellWidth.setW(columnWidth);
+                        cellWidth.setType(STTblWidth.DXA);
+                    }
                 }
             }
         }
