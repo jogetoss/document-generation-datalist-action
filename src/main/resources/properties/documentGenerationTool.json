@@ -147,11 +147,6 @@
                 "name": "wordFileName",
                 "label": "@@tool.DocumentGenerationTool.wordFileName@@",
                 "type": "textfield"
-            },
-            {
-                "name": "zipFileName",
-                "label": "@@tool.DocumentGenerationTool.zipFileName@@",
-                "type": "textfield"
             }
         ]
     }
