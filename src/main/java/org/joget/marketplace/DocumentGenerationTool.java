@@ -1,6 +1,8 @@
 package org.joget.marketplace;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -13,7 +15,7 @@ import org.joget.apps.form.model.FormRow;
 import org.joget.apps.form.model.FormRowSet;
 import org.joget.apps.form.service.FileUtil;
 import org.joget.apps.form.service.FormUtil;
-import org.joget.commons.util.UuidGenerator;
+import org.joget.commons.util.LogUtil;
 import org.joget.marketplace.util.DocumentGenerationUtil;
 import org.joget.plugin.base.DefaultApplicationPlugin;
 import org.joget.workflow.model.WorkflowAssignment;
@@ -53,17 +55,45 @@ public class DocumentGenerationTool extends DefaultApplicationPlugin {
         String filePath = getPropertyString("filePath");;
         String formDefId = getPropertyString("formDefId");
         String fileFieldId = getPropertyString("fileFieldId");
+        String pathOptions = getPropertyString("pathOptions");
 
         if (outputFile.exists()) {
-            String fileName = outputFile.getName();
-            String tableName = appService.getFormTableName(appDef, formDefId);
-            //String id = UuidGenerator.getInstance().getUuid();
-            FileUtil.storeFile(outputFile, tableName, recordId);
-            FormRowSet rows = new FormRowSet();
-            FormRow row = new FormRow();
-            row.put(fileFieldId, fileName);
-            rows.add(row);
-            appService.storeFormData(formDefId, tableName, rows, recordId);
+            if ("FILE_PATH".equalsIgnoreCase(pathOptions)) {
+                File folder = new File(filePath);
+                if (!folder.exists()) {
+                    folder.mkdirs();
+                }
+
+                String baseName = getBaseName(outputFile.getName());
+                String extension = getExtension(outputFile.getName());
+
+                File destination = new File(folder, outputFile.getName());
+                int counter = 1;
+
+                while (destination.exists()) {
+                    String newName = baseName + "(" + counter + ")" + extension;
+                    destination = new File(folder, newName);
+                    counter++;
+                }
+
+                try {
+                    Files.copy(outputFile.toPath(), destination.toPath());
+                    LogUtil.info(getClassName(), "File saved to: " + destination.getAbsolutePath());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else if ("FORM_FIELD".equalsIgnoreCase(pathOptions)) {
+                String fileName = outputFile.getName();
+                String tableName = appService.getFormTableName(appDef, formDefId);
+                FileUtil.storeFile(outputFile, tableName, recordId);
+                FormRowSet rows = new FormRowSet();
+                FormRow row = new FormRow();
+                row.put(fileFieldId, fileName);
+                rows.add(row);
+                appService.storeFormData(formDefId, tableName, rows, recordId);
+                LogUtil.info(getClassName(), "File saved to form");
+            }
+         
         }
         return null;
     }
@@ -96,5 +126,15 @@ public class DocumentGenerationTool extends DefaultApplicationPlugin {
     @Override
     public String getPropertyOptions() {
         return AppUtil.readPluginResource(getClass().getName(), "/properties/documentGenerationTool.json", null, true, MESSAGE_PATH);
+    }
+
+    private static String getBaseName(String filename) {
+        int dotIndex = filename.lastIndexOf('.');
+        return (dotIndex == -1) ? filename : filename.substring(0, dotIndex);
+    }
+
+    private static String getExtension(String filename) {
+        int dotIndex = filename.lastIndexOf('.');
+        return (dotIndex == -1) ? "" : filename.substring(dotIndex);
     }
 }
