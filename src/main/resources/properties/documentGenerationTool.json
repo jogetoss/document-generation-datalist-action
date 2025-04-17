@@ -1,0 +1,158 @@
+[
+    {
+        "title": "@@tool.DocumentGenerationTool.config@@",
+        "properties": [
+            {
+                "name": "templateFile",
+                "label": "@@tool.DocumentGenerationTool.templateFile@@",
+                "type": "file",
+                "appPath": "[APP_PATH]",
+                "allowType": ".docx,.doc",
+                "required": "True"
+            },
+            {
+                "name": "formDefId",
+                "label": "@@tool.DocumentGenerationTool.form@@",
+                "type": "selectbox",
+                "options_ajax": "[CONTEXT_PATH]/web/json/console/app[APP_PATH]/forms/options",
+                "required": "True"
+            },
+            {
+                "name" : "recordId",
+                "label" : "@@tool.DocumentGenerationTool.recordId@@",
+                "type" : "textfield",
+                "description" : "@@tool.DocumentGenerationTool.recordId.desc@@"
+            },
+            {
+                "label": "@@tool.DocumentGenerationTool.imageDimension@@",
+                "type": "header",
+                "description": "@@tool.DocumentGenerationTool.imageDimension.desc@@"
+            },
+            {
+                "name": "imageWidth",
+                "label": "@@tool.DocumentGenerationTool.imageWidth@@",
+                "type": "textfield",
+                "description": "@@tool.DocumentGenerationTool.imageWidth.desc@@"
+            },
+            {
+                "name": "imageHeight",
+                "label": "@@tool.DocumentGenerationTool.imageHeight@@",
+                "type": "textfield",
+                "description": "@@tool.DocumentGenerationTool.imageHeight.desc@@"
+            },
+            {
+                "label": "@@tool.DocumentGenerationTool.gridCustomisation@@",
+                "type": "header",
+                "description": "@@tool.DocumentGenerationTool.gridCustomisation.desc@@"
+            },
+            {
+                "name": "gridWidth",
+                "label": "@@tool.DocumentGenerationTool.gridWidth@@",
+                "type": "textfield",
+                "description": "@@tool.DocumentGenerationTool.gridWidth.desc@@"
+            },
+            {
+                "name": "gridDirection",
+                "label": "@@tool.DocumentGenerationTool.gridDirection@@",
+                "type": "selectbox",
+                "value": "",
+                "options": [
+                    {
+                        "value": "",
+                        "label": ""
+                    },
+                    {
+                        "value": "vertical",
+                        "label": "Vertical"
+                    },
+                    {
+                        "value": "horizontal",
+                        "label": "Horizontal"
+                    }
+                ]
+            },
+            {
+                "name": "gridIncludeHeader",
+                "label": "@@tool.DocumentGenerationTool.gridIncludeHeader@@",
+                "type": "checkbox",
+                "options": [
+                    {
+                        "value": "true",
+                        "label": ""
+                    }
+                ]
+            }
+        ]
+    }, 
+    {
+        "title" : "@@tool.DocumentGenerationTool.fileOutput@@",
+        "properties" : [
+            {
+                "name":"pathOptions",
+                "label":"@@tool.DocumentGenerationTool.pathOptions@@",
+                "type":"selectbox",
+                "required":"True",
+                "options":[
+                   {
+                     "value": "",
+                     "label": ""
+                   },   
+                   {
+                     "value":"FILE_PATH",
+                     "label":"Enter File Path"
+                   },
+                   {
+                     "value":"FORM_FIELD",
+                     "label":"Form Field"
+                   }
+                ]
+            },
+             
+            {
+                "name": "filePath",
+                "label": "@@tool.DocumentGenerationTool.filePath@@",
+                "type": "textfield",
+                "required": "True",
+                "control_field":"pathOptions",
+                "control_value":"FILE_PATH",
+                "control_use_regex":"true"
+            },
+            
+            {
+                "name" : "pathFormDefId",
+                "label" : "@@tool.DocumentGenerationTool.pathFormDefId@@",
+                "type" : "selectbox",
+                "required" : "True",
+                "options_ajax": "[CONTEXT_PATH]/web/json/console/app[APP_PATH]/forms/options",
+                "control_field":"pathOptions",
+                "control_value":"FORM_FIELD",
+                "control_use_regex":"true"    
+            },
+            {
+                "name" : "fileFieldId",
+                "label" : "@@tool.DocumentGenerationTool.pathFileFieldId@@",
+                "type" : "selectbox",
+                "options_ajax_on_change" : "formDefId:pathFormDefId",
+                "options_ajax" : "[CONTEXT_PATH]/web/json/console/app[APP_PATH]/form/columns/options",
+                "required" : "True",
+                "control_field":"pathOptions",
+                "control_value":"FORM_FIELD",
+                "control_use_regex":"true"    
+            },
+            {
+                "label": "@@tool.DocumentGenerationTool.modifyExportedFile@@",
+                "type": "header"            
+            },
+            {
+                "name": "wordFileName",
+                "label": "@@tool.DocumentGenerationTool.wordFileName@@",
+                "type": "textfield"
+            },
+            {
+                "name": "zipFileName",
+                "label": "@@tool.DocumentGenerationTool.zipFileName@@",
+                "type": "textfield"
+            }
+        ]
+    }
+]

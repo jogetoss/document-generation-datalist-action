@@ -8,6 +8,8 @@ import org.osgi.framework.ServiceRegistration;
 
 public class Activator implements BundleActivator {
 
+    public static final String VERSION = "8.0.7";
+
     protected Collection<ServiceRegistration> registrationList;
 
     public void start(BundleContext context) {
@@ -15,6 +17,7 @@ public class Activator implements BundleActivator {
 
         //Register plugin here
         registrationList.add(context.registerService(DocumentGenerationDatalistAction.class.getName(), new DocumentGenerationDatalistAction(), null));
+        registrationList.add(context.registerService(DocumentGenerationTool.class.getName(), new DocumentGenerationTool(), null));
     }
 
     public void stop(BundleContext context) {
