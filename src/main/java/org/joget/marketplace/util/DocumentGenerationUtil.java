@@ -64,9 +64,9 @@ public class DocumentGenerationUtil {
     private static File generatedFile;
 
     protected static void replacePlaceholderInParagraphs(Map<String, String> dataParams, XWPFDocument xwpfDocument, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
-        for (Map.Entry<String, String> entry : dataParams.entrySet()) {
-            for (XWPFParagraph paragraph : xwpfDocument.getParagraphs()) {
-                String text = paragraph.getText();
+    for (Map.Entry<String, String> entry : dataParams.entrySet()) {
+        for (XWPFParagraph paragraph : xwpfDocument.getParagraphs()) {
+            String text = paragraph.getText();
                 if (text != null && !text.isEmpty() && text.contains(entry.getKey())) {
                     text = text.replace("${" + entry.getKey() + "}", entry.getValue());
                     for (int i = paragraph.getRuns().size() - 1; i >= 0; i--) {
@@ -76,14 +76,14 @@ public class DocumentGenerationUtil {
                     // if value is json
                     if (text.contains("[") || text.contains("]")) {
                         replacePlaceholderInJSON(text, xwpfDocument, paragraph, formDefId, gridIncludeHeader, gridDirection, gridWidth);
-                    } else {
-                        XWPFRun newRun = paragraph.createRun();
+                } else {
+                    XWPFRun newRun = paragraph.createRun();
                         newRun.setText(text);
-                    }
                 }
             }
         }
     }
+}
 
     protected static void replacePlaceholderInJSON(String text, XWPFDocument xwpfDocument, XWPFParagraph paragraph, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
         AppDefinition appDef = AppUtil.getCurrentAppDefinition();
@@ -211,11 +211,12 @@ public class DocumentGenerationUtil {
     
                 if (element.has("className")) {
                     String className = element.getString("className");
-    
+
                     // only for grid types
                     if (className.equals("org.joget.plugin.enterprise.AdvancedGrid") ||
                         className.equals("org.joget.plugin.enterprise.FormGrid") ||
-                        className.equals("org.joget.plugin.enterprise.ListGrid")) {
+                        className.equals("org.joget.plugin.enterprise.ListGrid") ||
+                         className.equals("org.joget.apps.form.lib.Grid")) {
     
                         if (element.has("properties")) {
                             JSONObject properties = element.getJSONObject("properties");
