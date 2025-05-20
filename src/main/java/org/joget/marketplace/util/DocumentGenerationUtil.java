@@ -75,7 +75,7 @@ public class DocumentGenerationUtil {
 
                     // if value is json
                     if (text.contains("[") || text.contains("]")) {
-                        replacePlaceholderInJSON(text, xwpfDocument, paragraph, formDefId, gridIncludeHeader, gridDirection, gridWidth);
+                        replacePlaceholderInJSON(entry.getKey(), text, xwpfDocument, paragraph, formDefId, gridIncludeHeader, gridDirection, gridWidth);
                 } else {
                     XWPFRun newRun = paragraph.createRun();
                         newRun.setText(text);
@@ -85,7 +85,7 @@ public class DocumentGenerationUtil {
     }
 }
 
-    protected static void replacePlaceholderInJSON(String text, XWPFDocument xwpfDocument, XWPFParagraph paragraph, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
+    protected static void replacePlaceholderInJSON(String textKey, String text, XWPFDocument xwpfDocument, XWPFParagraph paragraph, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
         AppDefinition appDef = AppUtil.getCurrentAppDefinition();
         String formDef = formDefId;
         FormDefinitionDao formDefinitionDao = (FormDefinitionDao) FormUtil.getApplicationContext().getBean("formDefinitionDao");
@@ -94,7 +94,7 @@ public class DocumentGenerationUtil {
         LinkedHashMap<String, String> headerMap = new LinkedHashMap<>();
         if (formDefinition != null) {
             JSONObject rootObject = new JSONObject(formDefinition.getJson());
-            extractHeaderMapFromGrid(rootObject, headerMap);
+            extractHeaderMapFromGrid(textKey, rootObject, headerMap);
         }
         JsonArray jsonArray = JsonParser.parseString(text).getAsJsonArray();
     
@@ -202,7 +202,7 @@ public class DocumentGenerationUtil {
         }
     }
 
-    protected static void extractHeaderMapFromGrid(JSONObject jsonObject, LinkedHashMap<String, String> headerMap) {
+    protected static void extractHeaderMapFromGrid(String textKey, JSONObject jsonObject, LinkedHashMap<String, String> headerMap) {
         if (jsonObject.has("elements") && jsonObject.get("elements") instanceof JSONArray) {
             JSONArray elementsArray = jsonObject.getJSONArray("elements");
     
@@ -220,15 +220,16 @@ public class DocumentGenerationUtil {
     
                         if (element.has("properties")) {
                             JSONObject properties = element.getJSONObject("properties");
-    
-                            if (properties.has("options")) {
-                                Object options = properties.get("options");
-                                if (options instanceof JSONArray) {
-                                    JSONArray optionsArray = (JSONArray) options;
-                                    for (int j = 0; j < optionsArray.length(); j++) {
-                                        JSONObject option = optionsArray.getJSONObject(j);
-                                        if (option.has("value") && option.has("label")) {
-                                            headerMap.put(option.getString("value"), option.getString("label"));
+                            if (properties.has("id") && properties.getString("id").equals(textKey)) {
+                                if (properties.has("options")) {
+                                    Object options = properties.get("options");
+                                    if (options instanceof JSONArray) {
+                                        JSONArray optionsArray = (JSONArray) options;
+                                        for (int j = 0; j < optionsArray.length(); j++) {
+                                            JSONObject option = optionsArray.getJSONObject(j);
+                                            if (option.has("value") && option.has("label")) {
+                                                headerMap.put(option.getString("value"), option.getString("label"));
+                                            }
                                         }
                                     }
                                 }
@@ -237,7 +238,7 @@ public class DocumentGenerationUtil {
                     }
                 }
 
-                extractHeaderMapFromGrid(element, headerMap);
+                extractHeaderMapFromGrid(textKey, element, headerMap);
             }
         }
     }
