@@ -63,10 +63,10 @@ public class DocumentGenerationUtil {
 
     private static File generatedFile;
 
-    protected static void replacePlaceholderInParagraphs(Map<String, String> dataParams, XWPFDocument xwpfDocument, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
-    for (Map.Entry<String, String> entry : dataParams.entrySet()) {
-        for (XWPFParagraph paragraph : xwpfDocument.getParagraphs()) {
-            String text = paragraph.getText();
+      protected static void replacePlaceholderInParagraphs(Map<String, String> dataParams, XWPFDocument xwpfDocument, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
+        for (Map.Entry<String, String> entry : dataParams.entrySet()) {
+            for (XWPFParagraph paragraph : new ArrayList<>(xwpfDocument.getParagraphs())) {
+                String text = paragraph.getText();
                 if (text != null && !text.isEmpty() && text.contains(entry.getKey())) {
                     text = text.replace("${" + entry.getKey() + "}", entry.getValue());
                     for (int i = paragraph.getRuns().size() - 1; i >= 0; i--) {
@@ -75,15 +75,36 @@ public class DocumentGenerationUtil {
 
                     // if value is json
                     if (text.contains("[") || text.contains("]")) {
-                        replacePlaceholderInJSON(entry.getKey(), text, xwpfDocument, paragraph, formDefId, gridIncludeHeader, gridDirection, gridWidth);
-                } else {
-                    XWPFRun newRun = paragraph.createRun();
+                        int start = text.indexOf('[');
+                        int end = text.lastIndexOf(']') + 1;
+
+                        String label = text.substring(0, start).trim();
+                        String jsonPart = text.substring(start, end);
+                        String endLabel = "";
+                        if (end < text.length()) {
+                            endLabel = text.substring(end).trim();
+                        }
+
+                        for (int i = paragraph.getRuns().size() - 1; i >= 0; i--) {
+                            paragraph.removeRun(i);
+                        }
+                        XWPFParagraph labelParagraph = xwpfDocument.insertNewParagraph(paragraph.getCTP().newCursor());
+                        XWPFRun labelRun = labelParagraph.createRun();
+                        labelRun.setText(label);
+
+                        replacePlaceholderInJSON(entry.getKey(), jsonPart, xwpfDocument, labelParagraph, formDefId, gridIncludeHeader, gridDirection, gridWidth);
+                    
+                        XWPFParagraph endLabelParagraph = xwpfDocument.insertNewParagraph(paragraph.getCTP().newCursor());
+                        XWPFRun endLabelRun = endLabelParagraph.createRun();
+                        endLabelRun.setText(endLabel);
+                    } else {
+                        XWPFRun newRun = paragraph.createRun();
                         newRun.setText(text);
+                    }
                 }
             }
         }
     }
-}
 
     protected static void replacePlaceholderInJSON(String textKey, String text, XWPFDocument xwpfDocument, XWPFParagraph paragraph, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
         AppDefinition appDef = AppUtil.getCurrentAppDefinition();
@@ -114,67 +135,42 @@ public class DocumentGenerationUtil {
         }
     
         // create table
-        int rowCount = tableData.size() + (includeHeader ? 1 : 0);
+        int dataRowCount = tableData.size();
         int colCount = orderedKeys.size();
 
-        XWPFTable table;
-        if ("vertical".equals(gridDirection)) {
-            table = createEmptyGridTable(rowCount, colCount, xwpfDocument, paragraph, gridWidth);
-        } else {
-            table = createEmptyGridTable(colCount, rowCount, xwpfDocument, paragraph, gridWidth);
-        }
+        int actualRows = "vertical".equals(gridDirection)
+                ? dataRowCount + (includeHeader ? 1 : 0)
+                : colCount;
+        int actualCols = "vertical".equals(gridDirection)
+                ? colCount
+                : dataRowCount + (includeHeader ? 1 : 0);
 
-        int rowIndex = 0;
-        
-        // insert table header
+        XWPFTable table = createEmptyGridTable(actualRows, actualCols, xwpfDocument, paragraph, gridWidth);
+
+        // insert headers
         if (includeHeader) {
-            int colIndex = 0;
-            for (String key : orderedKeys) {
-                String headerLabel = headerMap.getOrDefault(key, key);
-
-                if (table.getRow(rowIndex) == null) {
-                    table.createRow();
-                }
-
-                if (table.getRow(rowIndex).getCell(colIndex) == null) {
-                    table.getRow(rowIndex).createCell();
-                }
-
+            for (int i = 0; i < orderedKeys.size(); i++) {
+                String headerLabel = headerMap.getOrDefault(orderedKeys.get(i), orderedKeys.get(i));
                 if ("vertical".equals(gridDirection)) {
-                    table.getRow(rowIndex).getCell(colIndex).setText(headerLabel);
+                    table.getRow(0).getCell(i).setText(headerLabel);
                 } else {
-                    table.getRow(colIndex).getCell(rowIndex).setText(headerLabel);
+                    table.getRow(i).getCell(0).setText(headerLabel);
                 }
-
-                colIndex++;
             }
-            rowIndex++;
         }
 
-        // insert table values
-        for (List<String> row : tableData) {
-            int colIndex = 0;
-
-            // Ensure row exists
-            if (table.getRow(rowIndex) == null) {
-                table.createRow();
-            }
-
-            for (String value : row) {
-                // Ensure cell exists
-                if (table.getRow(rowIndex).getCell(colIndex) == null) {
-                    table.getRow(rowIndex).createCell();
-                }
-
+        // insert data rows
+        int dataStartIndex = includeHeader ? 1 : 0;
+        for (int rowIdx = 0; rowIdx < tableData.size(); rowIdx++) {
+            List<String> row = tableData.get(rowIdx);
+            for (int colIdx = 0; colIdx < row.size(); colIdx++) {
+                String value = row.get(colIdx);
                 if ("vertical".equals(gridDirection)) {
-                    table.getRow(rowIndex).getCell(colIndex).setText(value);
+                    table.getRow(dataStartIndex + rowIdx).getCell(colIdx).setText(value);
                 } else {
-                    table.getRow(colIndex).getCell(rowIndex).setText(value);
+                    table.getRow(colIdx).getCell(dataStartIndex + rowIdx).setText(value);
                 }
-
-                colIndex++;
             }
-            rowIndex++;
         }
     }
 
@@ -350,6 +346,7 @@ public class DocumentGenerationUtil {
 
     protected static XWPFTable createEmptyGridTable(int rows, int cols, XWPFDocument xwpfDocument, XWPFParagraph paragraph, String gridWidthStr) {
         XmlCursor cursor = paragraph.getCTP().newCursor();
+        cursor.toNextSibling();
         XWPFTable table = xwpfDocument.insertNewTbl(cursor);
 
         table.getCTTbl().getTblPr().addNewJc().setVal(STJc.CENTER);
