@@ -64,9 +64,9 @@ public class DocumentGenerationUtil {
     private static File generatedFile;
 
     protected static void replacePlaceholderInParagraphs(Map<String, String> dataParams, XWPFDocument xwpfDocument, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
-    for (Map.Entry<String, String> entry : dataParams.entrySet()) {
-        for (XWPFParagraph paragraph : xwpfDocument.getParagraphs()) {
-            String text = paragraph.getText();
+        for (Map.Entry<String, String> entry : dataParams.entrySet()) {
+            for (XWPFParagraph paragraph : xwpfDocument.getParagraphs()) {
+                String text = paragraph.getText();
                 if (text != null && !text.isEmpty() && text.contains(entry.getKey())) {
                     text = text.replace("${" + entry.getKey() + "}", entry.getValue());
                     for (int i = paragraph.getRuns().size() - 1; i >= 0; i--) {
@@ -76,43 +76,43 @@ public class DocumentGenerationUtil {
                     // if value is json
                     if (text.contains("[") || text.contains("]")) {
                         replacePlaceholderInJSON(entry.getKey(), text, xwpfDocument, paragraph, formDefId, gridIncludeHeader, gridDirection, gridWidth);
-                } else {
-                    XWPFRun newRun = paragraph.createRun();
+                    } else {
+                        XWPFRun newRun = paragraph.createRun();
                         newRun.setText(text);
+                    }
                 }
             }
         }
     }
-}
 
     protected static void replacePlaceholderInJSON(String textKey, String text, XWPFDocument xwpfDocument, XWPFParagraph paragraph, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
         AppDefinition appDef = AppUtil.getCurrentAppDefinition();
         String formDef = formDefId;
         FormDefinitionDao formDefinitionDao = (FormDefinitionDao) FormUtil.getApplicationContext().getBean("formDefinitionDao");
         FormDefinition formDefinition = formDefinitionDao.loadById(formDef, appDef);
-    
+
         LinkedHashMap<String, String> headerMap = new LinkedHashMap<>();
         if (formDefinition != null) {
             JSONObject rootObject = new JSONObject(formDefinition.getJson());
             extractHeaderMapFromGrid(textKey, rootObject, headerMap);
         }
         JsonArray jsonArray = JsonParser.parseString(text).getAsJsonArray();
-    
+
         boolean includeHeader = "true".equals(gridIncludeHeader);
         List<String> orderedKeys = new ArrayList<>(headerMap.keySet());
         List<List<String>> tableData = new ArrayList<>();
-    
+
         for (int i = 0; i < jsonArray.size(); i++) {
             JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
             List<String> rowValues = new ArrayList<>();
-    
+
             for (String key : orderedKeys) {
                 rowValues.add(jsonObject.has(key) ? jsonObject.get(key).getAsString() : "");
             }
-    
+
             tableData.add(rowValues);
         }
-    
+
         // create table
         int rowCount = tableData.size() + (includeHeader ? 1 : 0);
         int colCount = orderedKeys.size();
@@ -125,7 +125,7 @@ public class DocumentGenerationUtil {
         }
 
         int rowIndex = 0;
-        
+
         // insert table header
         if (includeHeader) {
             int colIndex = 0;
@@ -205,10 +205,10 @@ public class DocumentGenerationUtil {
     protected static void extractHeaderMapFromGrid(String textKey, JSONObject jsonObject, LinkedHashMap<String, String> headerMap) {
         if (jsonObject.has("elements") && jsonObject.get("elements") instanceof JSONArray) {
             JSONArray elementsArray = jsonObject.getJSONArray("elements");
-    
+
             for (int i = 0; i < elementsArray.length(); i++) {
                 JSONObject element = elementsArray.getJSONObject(i);
-    
+
                 if (element.has("className")) {
                     String className = element.getString("className");
 
@@ -217,7 +217,7 @@ public class DocumentGenerationUtil {
                         className.equals("org.joget.plugin.enterprise.FormGrid") ||
                         className.equals("org.joget.plugin.enterprise.ListGrid") ||
                          className.equals("org.joget.apps.form.lib.Grid")) {
-    
+
                         if (element.has("properties")) {
                             JSONObject properties = element.getJSONObject("properties");
                             if (properties.has("id") && properties.getString("id").equals(textKey)) {
@@ -242,7 +242,7 @@ public class DocumentGenerationUtil {
             }
         }
     }
-    
+
     protected static void fixPreCreatedTableFormatting(XWPFDocument xwpfDocument, String gridWidthStr) {
         for (XWPFTable table : xwpfDocument.getTables()) {
             // Ensure center alignment
@@ -253,13 +253,13 @@ public class DocumentGenerationUtil {
             if (gridWidthStr != "") {
                 int gridWidth = Integer.parseInt(gridWidthStr);
                 BigInteger columnWidth = BigInteger.valueOf(gridWidth / numCols);
-    
+
                 // Define table grid
                 CTTblGrid tblGrid = table.getCTTbl().addNewTblGrid();
                 for (int i = 0; i < numCols; i++) {
                     tblGrid.addNewGridCol().setW(columnWidth);
                 }
-    
+
                 // Apply column width to each cell
                 for (XWPFTableRow row : table.getRows()) {
                     for (XWPFTableCell cell : row.getTableCells()) {
@@ -512,9 +512,17 @@ public class DocumentGenerationUtil {
             if (customFileName == null || customFileName.isEmpty()) {
                 customFileName = "Doc File";
             }
-            customFileName = customFileName.replace("{row}", row) + ".docx"; 
+            for (Map.Entry<String, String> entry : matchedMap.entrySet()) {
+                String columnName = entry.getKey();
+                String columnValue = entry.getValue();
 
-            if (fileOutput.equals("file")){
+                // Replace {columnName} with actual column value
+                customFileName = customFileName.replace("{" + columnName + "}",
+                        sanitizeFilename(columnValue));
+            }
+
+            customFileName = customFileName + ".docx";
+            if (fileOutput.equals("file")) {
                 generatedFile = generateOutputFile(apachDoc, customFileName);
             } else {
                 writeResponseSingle(request, response, apachDoc, customFileName);
@@ -522,6 +530,14 @@ public class DocumentGenerationUtil {
         } catch (Exception e) {
             LogUtil.error(getClassName(), e, e.toString());
         }
+    }
+
+    private static String sanitizeFilename(String filename) {
+        if (filename == null || filename.isEmpty()) {
+            return "unknown";
+        }
+        // Remove or replace invalid filename characters
+        return filename.replaceAll("[^a-zA-Z0-9._\\-\\s]", "_").trim();
     }
 
     //Generate word file for multiple datalist row
@@ -676,7 +692,7 @@ public class DocumentGenerationUtil {
             outputStream.close();
         }
     }
-    
+
     protected static String convertHashMapToJson(Object data) {
         if (data instanceof List) {
             try {
@@ -705,7 +721,7 @@ public class DocumentGenerationUtil {
     }
 
     protected static File generateOutputFile(XWPFDocument apachDoc, String fileName) throws IOException {
-          File outFile = new File(fileName);
+        File outFile = new File(fileName);
 
         try (FileOutputStream out = new FileOutputStream(outFile)) {
             apachDoc.write(out);
