@@ -4,7 +4,7 @@
     <groupId>org.joget.marketplace</groupId>
     <artifactId>document-generation-datalist-action</artifactId>
     <packaging>bundle</packaging>
-    <version>8.0.10</version>
+    <version>8.0.11</version>
     <name>document-generation-datalist-action</name>
     <url>http://www.joget.org</url>
     <build>
