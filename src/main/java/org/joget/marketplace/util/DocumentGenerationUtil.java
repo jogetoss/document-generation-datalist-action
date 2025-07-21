@@ -63,15 +63,9 @@ public class DocumentGenerationUtil {
 
     private static File generatedFile;
 
-<<<<<<< HEAD
-    protected static void replacePlaceholderInParagraphs(Map<String, String> dataParams, XWPFDocument xwpfDocument, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
-        for (Map.Entry<String, String> entry : dataParams.entrySet()) {
-            for (XWPFParagraph paragraph : xwpfDocument.getParagraphs()) {
-=======
       protected static void replacePlaceholderInParagraphs(Map<String, String> dataParams, XWPFDocument xwpfDocument, String formDefId, String gridIncludeHeader, String gridDirection, String gridWidth) {
         for (Map.Entry<String, String> entry : dataParams.entrySet()) {
             for (XWPFParagraph paragraph : new ArrayList<>(xwpfDocument.getParagraphs())) {
->>>>>>> 9bce71db937f849d8e575cefdd97516ec3857149
                 String text = paragraph.getText();
                 if (text != null && !text.isEmpty() && text.contains(entry.getKey())) {
                     text = text.replace("${" + entry.getKey() + "}", entry.getValue());
@@ -81,9 +75,6 @@ public class DocumentGenerationUtil {
 
                     // if value is json
                     if (text.contains("[") || text.contains("]")) {
-<<<<<<< HEAD
-                        replacePlaceholderInJSON(entry.getKey(), text, xwpfDocument, paragraph, formDefId, gridIncludeHeader, gridDirection, gridWidth);
-=======
                         int start = text.indexOf('[');
                         int end = text.lastIndexOf(']') + 1;
 
@@ -106,7 +97,6 @@ public class DocumentGenerationUtil {
                         XWPFParagraph endLabelParagraph = xwpfDocument.insertNewParagraph(paragraph.getCTP().newCursor());
                         XWPFRun endLabelRun = endLabelParagraph.createRun();
                         endLabelRun.setText(endLabel);
->>>>>>> 9bce71db937f849d8e575cefdd97516ec3857149
                     } else {
                         XWPFRun newRun = paragraph.createRun();
                         newRun.setText(text);
@@ -155,15 +145,9 @@ public class DocumentGenerationUtil {
                 ? colCount
                 : dataRowCount + (includeHeader ? 1 : 0);
 
-<<<<<<< HEAD
-        int rowIndex = 0;
-
-        // insert table header
-=======
         XWPFTable table = createEmptyGridTable(actualRows, actualCols, xwpfDocument, paragraph, gridWidth);
 
         // insert headers
->>>>>>> 9bce71db937f849d8e575cefdd97516ec3857149
         if (includeHeader) {
             for (int i = 0; i < orderedKeys.size(); i++) {
                 String headerLabel = headerMap.getOrDefault(orderedKeys.get(i), orderedKeys.get(i));
