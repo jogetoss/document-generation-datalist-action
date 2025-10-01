@@ -38,62 +38,59 @@ public class DocumentGenerationTool extends DefaultApplicationPlugin {
         AppDefinition appDef = (AppDefinition) properties.get("appDef");
         WorkflowAssignment wfAssignment = (WorkflowAssignment) properties.get("workflowAssignment");
         String recordId = getPropertyString("recordId");
-        if (recordId == null && recordId.equals("")) {
-            if (wfAssignment != null) {
-                recordId = appService.getOriginProcessId(wfAssignment.getProcessId());
-            }
+        if (recordId.equals("")) {
+            recordId = appService.getOriginProcessId(wfAssignment.getProcessId());
         }
 
-        DocumentGenerationUtil.generateSingleFile(request, response, recordId,
-                getPropertyString("formDefId"), getPropertyString("templateFile"),
-                getPropertyString("gridIncludeHeader"), getPropertyString("gridDirection"),
-                getPropertyString("wordFileName"), getPropertyString("gridWidth"),
-                getPropertyString("imageWidth"), getPropertyString("imageHeight"), "file");
-
-        // file output
-        File outputFile = DocumentGenerationUtil.getGeneratedFile();
         String filePath = getPropertyString("filePath");;
         String formDefId = getPropertyString("formDefId");
         String fileFieldId = getPropertyString("fileFieldId");
         String pathOptions = getPropertyString("pathOptions");
+        String templateFile = getPropertyString("templateFile");
+        String gridIncludeHeader = getPropertyString("gridIncludeHeader");
+        String gridDirection = getPropertyString("gridDirection");
+        String wordFileName = getPropertyString("wordFileName");
+        String gridWidth = getPropertyString("gridWidth");
+        String imageWidth = getPropertyString("imageWidth");
+        String imageHeight = getPropertyString("imageHeight");
+        String pathFormDefId = getPropertyString("pathFormDefId");
 
-        if (outputFile.exists()) {
-            if ("FILE_PATH".equalsIgnoreCase(pathOptions)) {
-                File folder = new File(filePath);
-                if (!folder.exists()) {
-                    folder.mkdirs();
-                }
+        if (wordFileName == "" || wordFileName.trim().isEmpty()) {
+            wordFileName = "Doc File";
+        }
 
-                String baseName = getBaseName(outputFile.getName());
-                String extension = getExtension(outputFile.getName());
+        if ("FILE_PATH".equalsIgnoreCase(pathOptions)) {
+            DocumentGenerationUtil.generateSingleFile(request, response, recordId,
+                    formDefId, templateFile,
+                    gridIncludeHeader, gridDirection,
+                    filePath + "/" + wordFileName, gridWidth,
+                    imageWidth, imageHeight, "file");
+            File outputFile = DocumentGenerationUtil.getGeneratedFile();
+            if (outputFile.exists()) {
+                LogUtil.info(getClassName(), "File saved to: " + filePath);
+            } 
 
-                File destination = new File(folder, outputFile.getName());
-                int counter = 1;
+        } else if ("FORM_FIELD".equalsIgnoreCase(pathOptions)) {
+            DocumentGenerationUtil.generateSingleFile(request, response, recordId,
+                    formDefId, templateFile,
+                    gridIncludeHeader, gridDirection,
+                    wordFileName, gridWidth,
+                    imageWidth, imageHeight, "file");
 
-                while (destination.exists()) {
-                    String newName = baseName + "(" + counter + ")" + extension;
-                    destination = new File(folder, newName);
-                    counter++;
-                }
+            File outputFile = DocumentGenerationUtil.getGeneratedFile();
 
-                try {
-                    Files.copy(outputFile.toPath(), destination.toPath());
-                    LogUtil.info(getClassName(), "File saved to: " + destination.getAbsolutePath());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            } else if ("FORM_FIELD".equalsIgnoreCase(pathOptions)) {
+            if (outputFile.exists()) {
                 String fileName = outputFile.getName();
-                String tableName = appService.getFormTableName(appDef, formDefId);
+                String tableName = appService.getFormTableName(appDef, pathFormDefId);
                 FileUtil.storeFile(outputFile, tableName, recordId);
                 FormRowSet rows = new FormRowSet();
                 FormRow row = new FormRow();
+                row.setId(recordId);
                 row.put(fileFieldId, fileName);
                 rows.add(row);
-                appService.storeFormData(formDefId, tableName, rows, recordId);
+                appService.storeFormData(pathFormDefId, tableName, rows, recordId);
                 LogUtil.info(getClassName(), "File saved to form");
             }
-         
         }
         return null;
     }
