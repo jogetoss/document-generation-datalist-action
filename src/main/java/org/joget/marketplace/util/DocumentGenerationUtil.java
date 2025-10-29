@@ -44,6 +44,7 @@ import org.joget.apps.app.service.AppUtil;
 import org.joget.apps.form.model.FormRow;
 import org.joget.apps.form.model.FormRowSet;
 import org.joget.apps.form.service.FileUtil;
+import org.joget.commons.util.FileManager;
 import org.joget.commons.util.LogUtil;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -718,7 +719,7 @@ public class DocumentGenerationUtil {
     }
 
     protected static File generateOutputFile(XWPFDocument apachDoc, String fileName) throws IOException {
-        File outFile = new File(fileName);
+        File outFile = new File(FileManager.getBaseDirectory() + fileName);
 
         try (FileOutputStream out = new FileOutputStream(outFile)) {
             apachDoc.write(out);
